@@ -23,7 +23,7 @@ for line in lines:
     value = int(first + last)
     total += value
 
-print("Part 1", total)
+print("Part 1:", total)
 
 # lines = [
 # "two1nine",
@@ -56,4 +56,4 @@ for line in lines:
     value = int(first + last)
     total += value
 
-print("Part 2", total)
+print("Part 2:", total)
