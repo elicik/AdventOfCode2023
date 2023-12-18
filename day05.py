@@ -9,41 +9,41 @@ lines = []
 with open("day05.txt") as input_file:
     lines = input_file.read().rstrip().split("\n")
 
-lines = [
-"seeds: 79 14 55 13",
-"",
-"seed-to-soil map:",
-"50 98 2",
-"52 50 48",
-"",
-"soil-to-fertilizer map:",
-"0 15 37",
-"37 52 2",
-"39 0 15",
-"",
-"fertilizer-to-water map:",
-"49 53 8",
-"0 11 42",
-"42 0 7",
-"57 7 4",
-"",
-"water-to-light map:",
-"88 18 7",
-"18 25 70",
-"",
-"light-to-temperature map:",
-"45 77 23",
-"81 45 19",
-"68 64 13",
-"",
-"temperature-to-humidity map:",
-"0 69 1",
-"1 0 69",
-"",
-"humidity-to-location map:",
-"60 56 37",
-"56 93 4"
-]
+# lines = [
+# "seeds: 79 14 55 13",
+# "",
+# "seed-to-soil map:",
+# "50 98 2",
+# "52 50 48",
+# "",
+# "soil-to-fertilizer map:",
+# "0 15 37",
+# "37 52 2",
+# "39 0 15",
+# "",
+# "fertilizer-to-water map:",
+# "49 53 8",
+# "0 11 42",
+# "42 0 7",
+# "57 7 4",
+# "",
+# "water-to-light map:",
+# "88 18 7",
+# "18 25 70",
+# "",
+# "light-to-temperature map:",
+# "45 77 23",
+# "81 45 19",
+# "68 64 13",
+# "",
+# "temperature-to-humidity map:",
+# "0 69 1",
+# "1 0 69",
+# "",
+# "humidity-to-location map:",
+# "60 56 37",
+# "56 93 4"
+# ]
 
 step = 1
 seeds = []
@@ -58,36 +58,8 @@ temperature_to_humidity = {}
 humidity_to_location = {}
 
 def insert_into_map(line, map):
-    destination, source, range_length = line.split()
-    map[int(source)] = (int(range_length), int(destination))
-
-@functools.lru_cache()
-def convert_seed_to_soil(seed):
-    return convert(seed, seed_to_soil)
-
-@functools.lru_cache()
-def convert_soil_to_fertilizer(soil):
-    return convert(soil, soil_to_fertilizer)
-
-@functools.lru_cache()
-def convert_fertilizer_to_water(fertilizer):
-    return convert(fertilizer, fertilizer_to_water)
-
-@functools.lru_cache()
-def convert_water_to_light(water):
-    return convert(water, water_to_light)
-
-@functools.lru_cache()
-def convert_light_to_temperature(light):
-    return convert(light, light_to_temperature)
-
-@functools.lru_cache()
-def convert_temperature_to_humidity(temperature):
-    return convert(temperature, temperature_to_humidity)
-
-@functools.lru_cache()
-def convert_humidity_to_location(humidity):
-    return convert(humidity, humidity_to_location)
+    destination, start, range_length = line.split()
+    map[int(start)] = (int(start), int(range_length), int(destination))
 
 def convert(source, map):
     found = False
@@ -97,23 +69,57 @@ def convert(source, map):
             break
     if not found:
         return source
-    range_length, destination = map[source_start]
+    _, range_length, destination = map[source_start]
     if source < source_start + range_length:
         return source - source_start + destination
     else:
         return source
 
-@functools.lru_cache()
-def convert_seed_to_location(seed):
-    soil = convert_seed_to_soil(seed)
-    fertilizer = convert_soil_to_fertilizer(soil)
-    water = convert_fertilizer_to_water(fertilizer)
-    light = convert_water_to_light(water)
-    temperature = convert_light_to_temperature(light)
-    humidity = convert_temperature_to_humidity(temperature)
-    location = convert_humidity_to_location(humidity)
-    # print(seed, soil, fertilizer, water, light, temperature, humidity, location)
-    return location
+def combine_maps(first_map, second_map):
+    first_ranges_by_start = sorted(list(first_map.values()), key=lambda x: x[0])
+    first_ranges_by_destination = sorted(list(first_map.values()), key=lambda x: x[2])
+    second_ranges = sorted(list(second_map.values()), key=lambda x: x[0])
+    new_map = {}
+    for first_range in first_ranges_by_destination:
+        first_start, first_range_length, first_destination = first_range
+        for second_range in second_ranges:
+            second_start, second_range_length, second_destination = second_range
+            # range is too early
+            if second_start + second_range_length < first_destination:
+                continue
+            # range is too late
+            if second_start >= first_destination + first_range_length:
+                break
+
+            overlap_start = max([first_destination, second_start])
+            overlap_end = min([first_destination + first_range_length, second_start + second_range_length])
+            overlap_range_length = overlap_end - overlap_start
+            if overlap_range_length == 0:
+                continue
+            new_start = first_start + (overlap_start - first_destination)
+            new_destination = (second_destination - second_start) + (first_destination - first_start) + new_start
+            new_map[new_start] = (new_start, overlap_range_length, new_destination)
+
+    return new_map
+
+def fill_map(map):
+    ranges = sorted(list(map.values()), key=lambda x: x[0])
+    # Check that first range has a source of 0
+    if ranges[0][0] != 0:
+        map[0] = (0, ranges[0][0], 0)
+    # Check that last range has a range length of inf
+    if ranges[-1][1] != math.inf:
+        new_start = ranges[-1][0] + ranges[-1][1]
+        map[new_start] = (new_start, math.inf, new_start)
+    
+    ranges = sorted(list(map.values()), key=lambda x: x[0])
+    for i in range(len(ranges) - 1):
+        curr_end = ranges[i][0] + ranges[i][1]
+        next_start = ranges[i+1][0]
+        if curr_end != next_start:
+            new_start = curr_end
+            new_range_length = next_start - curr_end
+            map[new_start] = (new_start, new_range_length, new_start)
 
 for line in lines:
     if line == "":
@@ -138,41 +144,40 @@ for line in lines:
     if step == 8:
         insert_into_map(line, humidity_to_location)
 
-min_location = math.inf
+fill_map(seed_to_soil)
+fill_map(soil_to_fertilizer)
+fill_map(fertilizer_to_water)
+fill_map(water_to_light)
+fill_map(light_to_temperature)
+fill_map(temperature_to_humidity)
+fill_map(humidity_to_location)
+
+seedrange_map = {}
 for seed in seeds:
-    location = convert_seed_to_location(seed)
-    if location < min_location:
-        min_location = location
+    seedrange_map[seed] = (seed, 1, seed)
 
-print("Part 1:", min_location)
+seedrange_to_soil = combine_maps(seedrange_map, seed_to_soil)
+seedrange_to_fertilizer = combine_maps(seedrange_to_soil, soil_to_fertilizer)
+seedrange_to_water = combine_maps(seedrange_to_fertilizer, fertilizer_to_water)
+seedrange_to_light = combine_maps(seedrange_to_water, water_to_light)
+seedrange_to_temperature = combine_maps(seedrange_to_light, light_to_temperature)
+seedrange_to_humidity = combine_maps(seedrange_to_temperature, temperature_to_humidity)
+seedrange_to_location = combine_maps(seedrange_to_humidity, humidity_to_location)
 
-all_seed_ranges = []
+print("Part 1:", min([x[2] for x in seedrange_to_location.values()]))
+
+seedrange_map = {}
 for i in range(len(seeds) // 2):
     start = seeds[2*i]
     range_length = seeds[2*i+1]
-    end = start + range_length - 1
-    all_seed_ranges.append((start, end))
+    seedrange_map[start] = (start, range_length, start)
 
-all_seed_ranges.sort(key=lambda x: x[0])
-new_seed_ranges = [all_seed_ranges[0]]
+seedrange_to_soil = combine_maps(seedrange_map, seed_to_soil)
+seedrange_to_fertilizer = combine_maps(seedrange_to_soil, soil_to_fertilizer)
+seedrange_to_water = combine_maps(seedrange_to_fertilizer, fertilizer_to_water)
+seedrange_to_light = combine_maps(seedrange_to_water, water_to_light)
+seedrange_to_temperature = combine_maps(seedrange_to_light, light_to_temperature)
+seedrange_to_humidity = combine_maps(seedrange_to_temperature, temperature_to_humidity)
+seedrange_to_location = combine_maps(seedrange_to_humidity, humidity_to_location)
 
-for seed_range in all_seed_ranges[1:]:
-    last_seed_range = new_seed_ranges[-1]
-    if seed_range[0] > last_seed_range[1]:
-        new_seed_ranges.append(seed_range)
-    elif seed_range[1] > last_seed_range[1]:
-        # combine seed ranges
-        new_seed_ranges[-1] = (last_seed_range[0], seed_range[1])
-    # elif seed_range[1] <= last_seed_range[1]:
-        # do nothing
-
-# print(new_seed_ranges)
-
-min_location = math.inf
-for seed_range in new_seed_ranges:
-    for seed in range(seed_range[0], seed_range[1] + 1):
-        location = convert_seed_to_location(seed)
-        if location < min_location:
-            min_location = location
-
-print("Part 2:", min_location)
+print("Part 2:", min([x[2] for x in seedrange_to_location.values()]))
